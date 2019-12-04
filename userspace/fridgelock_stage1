@@ -1,0 +1,51 @@
+#!/bin/bash
+
+{
+# Create RAMDisk
+mkdir -p /fridgelock
+mount -t tmpfs -o size=200m none /fridgelock
+
+# Copy files to ramdisk
+WD=/usr/local/lib/
+cd /fridgelock
+tar -xf ${WD}/ramfs.tar.xz
+
+# Mount needed filesystems
+for i in dev sys proc; do
+	mkdir /fridgelock/$i
+	mount --bind /$i /fridgelock/$i
+done
+
+# Load modules the kernel might need during resume
+modprobe af_alg
+modprobe algif_skcipher
+
+##############################################
+# Step 2                                     #
+# Determine which devices we have to suspend #
+##############################################
+
+DEVICES=() 
+
+# Suspend all devices that are crypted
+for i in /sys/block/*/dm; do
+	MAPPING_NAME="/dev/mapper/$(cat $i/name)"
+
+	# Look for cryptdevices according to their prefix
+	if grep ^CRYPT- $i/uuid > /dev/null; then
+		# Do not consider devices that are already suspended
+		if grep 0 $i/suspended > /dev/null; then
+			echo "Will suspend cryptdevice: $MAPPING_NAME"
+			DEVICES+=($MAPPING_NAME)
+		else
+			echo "Skipping cryptdevice: $MAPPING_NAME (already suspended)"
+		fi
+		#cryptsetup luksSuspend $MAPPING_NAME
+	else
+		echo "Not a cryptdevice: $MAPPING_NAME"
+	fi
+done
+
+# Finally chroot into our custom "initramfs" and signal the system to proceed in go to sleep
+chroot /fridgelock /bin/fridgelock_stage2 ${DEVICES[@]}
+} > /dev/kmsg 2> /dev/kmsg
