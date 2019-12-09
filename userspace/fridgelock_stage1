@@ -27,7 +27,7 @@ modprobe algif_skcipher
 
 DEVICES=() 
 
-# Suspend all devices that are crypted
+# Get mapping of all devices that are crypted
 for i in /sys/block/*/dm; do
 	MAPPING_NAME="/dev/mapper/$(cat $i/name)"
 
@@ -40,12 +40,11 @@ for i in /sys/block/*/dm; do
 		else
 			echo "Skipping cryptdevice: $MAPPING_NAME (already suspended)"
 		fi
-		#cryptsetup luksSuspend $MAPPING_NAME
 	else
 		echo "Not a cryptdevice: $MAPPING_NAME"
 	fi
 done
 
-# Finally chroot into our custom "initramfs" and signal the system to proceed in go to sleep
+# Chroot into our custom "initramfs" and send the mappings to our kernel module
 chroot /fridgelock /bin/fridgelock_stage2 ${DEVICES[@]}
 } > /dev/kmsg 2> /dev/kmsg

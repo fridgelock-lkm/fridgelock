@@ -61,12 +61,6 @@ int main(int argc, char *argv[])
 		LOG("Failed opening device\n");
 		return -1;
 	}
-
-	// Suspend devices on command line
-	//for(int i=1;i<argc;i++) {
-	//	char *args[] = {"/bin/cryptsetup", "luksSuspend", argv[i], NULL};
-	//	run("/bin/cryptsetup", args);
-	//}
 	
 	unsigned short length = 0;
 	for(int i=1;i<argc;i++) {
@@ -97,10 +91,10 @@ int main(int argc, char *argv[])
 
 	// Resume devices on command line
 	for(int i=1;i<argc;i++) {
-		//char *args[] = {"/bin/cryptsetup", "luksResume", argv[i], NULL};
-		char *args[] = {"/bin/strace", "/bin/cryptsetup", "luksResume", argv[i], NULL};
+		char *args[] = {"/bin/cryptsetup", "luksResume", argv[i], NULL};
+		//char *args[] = {"/bin/strace", "/bin/cryptsetup", "luksResume", argv[i], NULL};
 		puts("About to run cryptsetup to resume partition!");
-		if (!run(args[0], args)) {
+		if (run(args[0], args)) {
 			puts("Resuming via cryptsetup failed!");
 			i--;
 			continue;
