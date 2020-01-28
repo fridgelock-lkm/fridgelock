@@ -87,20 +87,6 @@ static int notifier_hook(struct notifier_block *nb, unsigned long val, void *up)
 	switch (val) {
 	case PM_SUSPEND_PREPARE:
 
-		/* Make userspace not freezable */
-		/*
-		for_each_process_thread(p, t) {
-			int i;
-			for (i = 0; i < ARRAY_SIZE(hot_processes); i++) {
-				if (strcmp(t->comm, hot_processes[i]) == 0) {
-					printk(KERN_INFO "[fridgelock] Skipping freeze of %s with pid %d\n", t->comm, t->pid);
-					t->flags |= PF_NOFREEZE;
-				}
-			}
-
-		}
-		*/
-
 		/* Sync filesystems so we can clear more cached data */
 		ksys_sync_ptr = (void (*)(void))kallsyms_lookup_name("ksys_sync");
 		if (ksys_sync_ptr == NULL) {
@@ -139,11 +125,6 @@ static int notifier_hook(struct notifier_block *nb, unsigned long val, void *up)
 	return 0;
 }
 
-struct iv_essiv_private {
-	struct crypto_shash *hash_tfm;
-	u8 *salt;
-};
-
 struct iv_benbi_private {
 	int shift;
 };
@@ -161,13 +142,6 @@ struct iv_tcw_private {
 	u8 *whitening;
 };
 
-struct iv_eboiv_private {
-	struct crypto_cipher *tfm;
-};
-
-/*
- * The fields in here must be read only after initialization.
- */
 struct crypt_config {
 	struct dm_dev *dev;
 	sector_t start;
@@ -181,26 +155,21 @@ struct crypt_config {
 	struct task_struct *write_thread;
 	struct rb_root write_tree;
 
-	char *cipher;
 	char *cipher_string;
 	char *cipher_auth;
 	char *key_string;
 
 	const struct crypt_iv_operations *iv_gen_ops;
 	union {
-		struct iv_essiv_private essiv;
 		struct iv_benbi_private benbi;
 		struct iv_lmk_private lmk;
 		struct iv_tcw_private tcw;
-		struct iv_eboiv_private eboiv;
 	} iv_gen_private;
 	u64 iv_offset;
 	unsigned int iv_size;
 	unsigned short int sector_size;
 	unsigned char sector_shift;
 
-	/* ESSIV: struct crypto_cipher *essiv_tfm */
-	void *iv_private;
 	union {
 		struct crypto_skcipher **tfms;
 		struct crypto_aead **tfms_aead;
@@ -253,17 +222,12 @@ struct crypt_config {
 
 static int crypt_message_entry(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
+	printk(KERN_INFO "In crypt_message_entry\n");
 	// TODO: This relies on x86-64
 	// TODO: Make this work for more than 1 partition
 	struct dm_target* ti = (struct dm_target *) regs->di;
 	unsigned argc = regs->si;
 	char **argv = (char **) regs->dx;
-	/*
-	int i;
-	for (i =0; i < argc; i++) {
-		printk(KERN_INFO "Argv[%d]: '%s'\n", i, argv[i]);
-	}
-	*/
 
 	if (encdec_key) {
 		memset(encdec_key, '\x00', key_len);
@@ -285,13 +249,6 @@ static int crypt_message_entry(struct kretprobe_instance *ri, struct pt_regs *re
 		encdec_key = kmalloc(key_len, GFP_KERNEL);
 		hex2bin(encdec_key, hex_key, key_len);
 	}
-
-	// Might contain bad chars...
-	/*
-	for (i = 0; i < key_len; i++) {
-		printk(KERN_INFO "New key is: '%c'\n", encdec_key[i]);
-	}
-	*/
 	
 	return 0;
 }
@@ -330,10 +287,13 @@ static int invalidate_inode_page_entry(struct kretprobe_instance *ri, struct pt_
 	if (addr) {
 		//printk(KERN_INFO "Memsetting page with flags: %lx\n", page->flags);
 		//printk(KERN_INFO "Mapped addr:: %px\n", addr);
+
+		/* TODO: newer kernel detects this and prints stacktrace
 		DISABLE_W_PROTECTED_MEMORY
 		zeroed_pages++;
 		memset(addr, '\0', PAGE_SIZE);
 		ENABLE_W_PROTECTED_MEMORY
+		*/
 	}
 	kunmap_atomic(addr);
 	return 0;
@@ -555,7 +515,6 @@ static int late_suspend(struct device *device)
 		key_len = 0;
 	}
 
-
 	return 0;
 }
 
@@ -570,7 +529,7 @@ static int early_resume(struct device *dev)
 	printk(KERN_INFO "[fridgelock] Resume process should now be up again\n");
 	/* Wait until userspace tells us to continue */
 	wait_event_interruptible(resume_queue, (resume_done == 1));
-	/* now decrypt the processes (TODO: with the received key) */
+
 	if (decrypt_processes()) {
 		printk(KERN_INFO "[fridgelock] Decrypting processes failed\n");
 	}

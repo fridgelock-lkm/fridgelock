@@ -1,11 +1,10 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
-#include <stropts.h>
 #include <mntent.h>
 #include <errno.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
