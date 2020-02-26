@@ -946,7 +946,7 @@ int encrypt_processes(void)
 
 	/* Allocate the skcipher */
 	if (!tfm) {
-		tfm = crypto_alloc_skcipher(CRYPT_ALG, CRYPTO_ALG_TYPE_ABLKCIPHER, 0);
+		tfm = crypto_alloc_skcipher(CRYPT_ALG, 0, CRYPTO_ALG_ASYNC);
 		if(IS_ERR(tfm)) {
 			printk("__refrigerator [%s] Could not allocate block cipher: %s\n",
 				__func__, CRYPT_ALG);
@@ -1107,7 +1107,7 @@ int decrypt_processes(void)
 
 	/* Allocate the skcipher */
 	if (!tfm) {
-		tfm = crypto_alloc_skcipher(CRYPT_ALG, CRYPTO_ALG_TYPE_ABLKCIPHER, 0);
+		tfm = crypto_alloc_skcipher(CRYPT_ALG, 0, CRYPTO_ALG_ASYNC);
 		if(IS_ERR(tfm)) {
 			printk("__refrigerator [%s] Could not allocate block cipher: %s\n",
 				__func__, CRYPT_ALG);
